@@ -1,13 +1,13 @@
 
-
+````
 # 🏗️ Protocolo de Inicialização: .NET 8 Web API
 
 **Objetivo:** Estabelecer uma estrutura de API robusta, escalável e padronizada utilizando .NET 8 e PostgreSQL (Supabase).
 **Stack:** C\# .NET 8, Entity Framework Core, PostgreSQL.
 
------
+---
 
-## 1\. Criação do Projeto (CLI)
+## 1. Criação do Projeto (CLI)
 
 Não use a interface do Visual Studio para criar projetos se quiser controle total. Use o terminal. Isso garante que a estrutura de pastas (`Solution` vs `Project`) seja criada corretamente.
 
@@ -27,7 +27,7 @@ dotnet sln add AgendaApi.Web/AgendaApi.Web.csproj
 
 # 5. Entra na pasta do projeto para começar a trabalhar
 cd AgendaApi.Web
-```
+````
 
 -----
 
@@ -203,6 +203,7 @@ public class ContatosController : ControllerBase
     {
         await _context.Contatos.AddAsync(contato);
         await _context.SaveChangesAsync();
+        // Retorna 201 Created com o link para obter o novo recurso
         return CreatedAtAction(nameof(ObterPorId), new { id = contato.Id }, contato);
     }
 
@@ -226,3 +227,11 @@ public class ContatosController : ControllerBase
 
 -----
 
+### Próximo Passo
+
+O próximo passo lógico e obrigatório em uma API é implementar as operações de **Atualização** (PUT) e **Exclusão** (DELETE) na sua `ContatosController`.
+
+Gostaria que eu gerasse o código para os métodos PUT e DELETE?
+
+```
+```
