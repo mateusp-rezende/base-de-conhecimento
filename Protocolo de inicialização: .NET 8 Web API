@@ -1,0 +1,228 @@
+
+
+# 🏗️ Protocolo de Inicialização: .NET 8 Web API
+
+**Objetivo:** Estabelecer uma estrutura de API robusta, escalável e padronizada utilizando .NET 8 e PostgreSQL (Supabase).
+**Stack:** C\# .NET 8, Entity Framework Core, PostgreSQL.
+
+-----
+
+## 1\. Criação do Projeto (CLI)
+
+Não use a interface do Visual Studio para criar projetos se quiser controle total. Use o terminal. Isso garante que a estrutura de pastas (`Solution` vs `Project`) seja criada corretamente.
+
+```powershell
+# 1. Cria a pasta raiz da solução
+mkdir AgendaApi
+cd AgendaApi
+
+# 2. Cria o arquivo de Solução (.sln) - O container lógico
+dotnet new sln --name AgendaApi
+
+# 3. Cria o projeto Web API
+dotnet new webapi -n AgendaApi.Web
+
+# 4. Vincula o projeto à solução
+dotnet sln add AgendaApi.Web/AgendaApi.Web.csproj
+
+# 5. Entra na pasta do projeto para começar a trabalhar
+cd AgendaApi.Web
+```
+
+-----
+
+## 2\. Gerenciamento de Dependências (NuGet)
+
+Instale estritamente as versões `8.0.x` para garantir estabilidade (LTS).
+
+```powershell
+# Driver do PostgreSQL (Evite SQL Server se não for usar)
+dotnet add package Npgsql.EntityFrameworkCore.PostgreSQL --version 8.0.0
+
+# Ferramentas de Design (Necessário para criar Migrations)
+dotnet add package Microsoft.EntityFrameworkCore.Design --version 8.0.0
+```
+
+-----
+
+## 3\. Arquitetura de Pastas
+
+Apague o arquivo `WeatherForecast.cs` e a controller de exemplo. Crie esta estrutura para manter a separação de responsabilidades:
+
+```text
+AgendaApi.Web/
+├── Context/       # Onde fica a conexão com o Banco (DbContext)
+├── Models/        # Onde ficam as Entidades (Tabelas)
+├── Controllers/   # Onde ficam os Endpoints (Rotas da API)
+├── Properties/    # Configurações de launch
+├── appsettings.json # Credenciais (Conexão)
+└── Program.cs     # Injeção de Dependência e Configuração
+```
+
+-----
+
+## 4\. Implementação do Código
+
+### Passo A: A Entidade (`Models/Contato.cs`)
+
+Define o formato dos dados. Use `Record` ou `Class`.
+
+```csharp
+namespace AgendaApi.Web.Models;
+
+public class Contato
+{
+    public int Id { get; set; }
+    public string Nome { get; set; }
+    public string Telefone { get; set; }
+    public bool Ativo { get; set; }
+}
+```
+
+### Passo B: O Contexto (`Context/AgendaContext.cs`)
+
+O cérebro do banco de dados. **Crítico:** Defina o Schema aqui.
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using AgendaApi.Web.Models;
+
+namespace AgendaApi.Web.Context;
+
+public class AgendaContext : DbContext
+{
+    public AgendaContext(DbContextOptions<AgendaContext> options) : base(options) { }
+
+    public DbSet<Contato> Contatos { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // ISOLAMENTO: Cria as tabelas dentro da pasta "agenda" no banco
+        modelBuilder.HasDefaultSchema("agenda"); 
+        base.OnModelCreating(modelBuilder);
+    }
+}
+```
+
+### Passo C: Conexão (`appsettings.json`)
+
+Use a porta 5432.
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Host=db.REF_DO_PROJETO.supabase.co;Port=5432;Database=postgres;Username=postgres;Password=SUA_SENHA_REAL;SSL Mode=Require;Trust Server Certificate=true"
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*"
+}
+```
+
+### Passo D: Configuração (`Program.cs`)
+
+Onde "ligamos" o Entity Framework.
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using AgendaApi.Web.Context;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 1. Adicionar Controladores
+builder.Services.AddControllers();
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// 2. CONFIGURAÇÃO DO BANCO (PostgreSQL)
+builder.Services.AddDbContext<AgendaContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+var app = builder.Build();
+
+// 3. Pipeline HTTP
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+
+app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
+
+app.Run();
+```
+
+-----
+
+## 5\. Sincronização com Banco (Migrations)
+
+Sempre execute estes comandos após alterar qualquer `Model`.
+
+```powershell
+# Cria o "plano" de criação das tabelas
+dotnet ef migrations add Inicializacao
+
+# Executa o plano no banco real
+dotnet ef database update
+```
+
+-----
+
+## 6\. Criando a API (Controller)
+
+Agora expomos os dados para o mundo. Crie `Controllers/ContatosController.cs`.
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore; // Necessário para métodos assíncronos
+using AgendaApi.Web.Context;
+using AgendaApi.Web.Models;
+
+namespace AgendaApi.Web.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class ContatosController : ControllerBase
+{
+    private readonly AgendaContext _context;
+
+    // Injeção de Dependência: O Contexto vem pronto para uso
+    public ContatosController(AgendaContext context)
+    {
+        _context = context;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Criar(Contato contato)
+    {
+        await _context.Contatos.AddAsync(contato);
+        await _context.SaveChangesAsync();
+        return CreatedAtAction(nameof(ObterPorId), new { id = contato.Id }, contato);
+    }
+
+    [HttpGet("{id}")]
+    public async Task<IActionResult> ObterPorId(int id)
+    {
+        var contato = await _context.Contatos.FindAsync(id);
+        if (contato == null) return NotFound();
+        return Ok(contato);
+    }
+    
+    [HttpGet]
+    public async Task<IActionResult> ListarTodos()
+    {
+        // Use ToListAsync para não travar a thread principal
+        var contatos = await _context.Contatos.ToListAsync();
+        return Ok(contatos);
+    }
+}
+```
+
+-----
+
