@@ -1,5 +1,4 @@
 
-````
 # 🏗️ Protocolo de Inicialização: .NET 8 Web API
 
 **Objetivo:** Estabelecer uma estrutura de API robusta, escalável e padronizada utilizando .NET 8 e PostgreSQL (Supabase).
