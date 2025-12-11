@@ -231,7 +231,96 @@ public class ContatosController : ControllerBase
 
 O próximo passo lógico e obrigatório em uma API é implementar as operações de **Atualização** (PUT) e **Exclusão** (DELETE) na sua `ContatosController`.
 
-Gostaria que eu gerasse o código para os métodos PUT e DELETE?
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using AgendaApi.Web.Context;
+using AgendaApi.Web.Models;
 
-```
+namespace AgendaApi.Web.Controllers;
+
+[ApiController]
+[Route("[controller]")]
+public class ContatosController : ControllerBase
+{
+    private readonly AgendaContext _context;
+
+    // Injeção de Dependência: O Contexto vem pronto para uso
+    public ContatosController(AgendaContext context)
+    {
+        _context = context;
+    }
+
+    // CREATE: POST /Contatos
+    [HttpPost]
+    public async Task<IActionResult> Criar(Contato contato)
+    {
+        await _context.Contatos.AddAsync(contato);
+        await _context.SaveChangesAsync();
+        // Retorna 201 Created com o link para obter o novo recurso
+        return CreatedAtAction(nameof(ObterPorId), new { id = contato.Id }, contato);
+    }
+
+    // READ: GET /Contatos/{id}
+    [HttpGet("{id}")]
+    public async Task<IActionResult> ObterPorId(int id)
+    {
+        var contato = await _context.Contatos.FindAsync(id);
+        if (contato == null) return NotFound();
+        return Ok(contato);
+    }
+    
+    // READ: GET /Contatos
+    [HttpGet]
+    public async Task<IActionResult> ListarTodos()
+    {
+        // Use ToListAsync para não travar a thread principal
+        var contatos = await _context.Contatos.ToListAsync();
+        return Ok(contatos);
+    }
+    
+    // UPDATE: PUT /Contatos/{id}
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Atualizar(int id, Contato contato)
+    {
+        // 1. O ID na URL deve ser igual ao ID no corpo da requisição
+        if (id != contato.Id)
+        {
+            return BadRequest(new { Error = "ID do corpo não corresponde ao ID da URL." });
+        }
+
+        // 2. Marca a entidade como modificada
+        _context.Contatos.Update(contato);
+        
+        // 3. Salva as mudanças no banco
+        await _context.SaveChangesAsync();
+
+        // 4. Retorna 204 No Content (padrão para sucesso em PUT)
+        return NoContent();
+    }
+    
+    // DELETE: DELETE /Contatos/{id}
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Deletar(int id)
+    {
+        // 1. Busca a entidade
+        var contato = await _context.Contatos.FindAsync(id);
+
+        if (contato == null)
+        {
+            // Retorna 404 se o recurso não existir (idempotência)
+            return NotFound();
+        }
+
+        // 2. Remove a entidade
+        _context.Contatos.Remove(contato);
+
+        // 3. Salva a mudança no banco
+        await _context.SaveChangesAsync();
+        
+        // 4. Retorna 204 No Content
+        return NoContent();
+    }
+}
+
+
 ```
