@@ -1,0 +1,46 @@
+
+
+Essa tabela não é apenas um dicionário, é organizada pelo **fluxo de trabalho** que usamos hoje: Criar -> Inserir -> Consultar -> Analisar.
+
+📘 Cheatsheet: Comandos Essenciais (T-SQL)
+| Categoria           | Comando          | O que faz (Explicação Sênior)                                                                    | Exemplo Prático                                              |
+| :------------------ | :--------------- | :----------------------------------------------------------------------------------------------- | :----------------------------------------------------------- |
+| **Criação**         | `CREATE TABLE`   | Cria a estrutura da tabela.                                                                      | `CREATE TABLE Maquinas (...);`                               |
+|                     | `IDENTITY(1,1)`  | Cria um ID que se preenche sozinho (Auto-incremento). Começa em 1, pula de 1 em 1.               | `Id INT IDENTITY(1,1) PRIMARY KEY`                           |
+|                     | `REFERENCES`     | Cria o link (Foreign Key) para outra tabela. Impede cadastrar dados órfãos.                      | `IdSetor INT REFERENCES Setores(Id)`                         |
+| **Manipulação**     | `INSERT INTO`    | Adiciona linhas na tabela.                                                                       | `INSERT INTO Maquinas (Nome) VALUES ('Torno');`              |
+|                     | `UPDATE`         | Atualiza dados existentes (Sempre use WHERE!).                                                   | `UPDATE Maquinas SET Status = 'Parada' WHERE Id = 1;`        |
+|                     | `DELETE`         | Remove linhas (Sempre use WHERE!).                                                               | `DELETE FROM Produtos WHERE Id = 5;`                         |
+| **Consulta**        | `SELECT *`       | Traz todas as colunas (Use só para espiar, evite em produção).                                   | `SELECT * FROM Apontamentos;`                                |
+|                     | `TOP N`          | Traz apenas as primeiras N linhas (Equivalente ao LIMIT).                                        | `SELECT TOP 10 * FROM Produtos;`                             |
+|                     | `DISTINCT`       | Remove duplicatas do resultado.                                                                  | `SELECT DISTINCT Status FROM Maquinas;`                      |
+| **Junções (Joins)** | `INNER JOIN`     | **O Interseção:** Traz apenas linhas que existem nas DUAS tabelas.                               | `FROM Pedidos p INNER JOIN Clientes c ON p.IdCli = c.Id`     |
+|                     | `LEFT JOIN`      | **A Prioridade:** Traz TUDO da tabela da esquerda e completa com NULL a da direita se não achar. | `FROM Maquinas m LEFT JOIN Apontamentos a ON m.Id = a.IdMaq` |
+| **Agregação**       | `GROUP BY`       | Agrupa linhas repetidas para poder somar ou contar. Obrigatório ao usar SUM/COUNT.               | `SELECT Setor, COUNT(*) FROM Maquinas GROUP BY Setor`        |
+|                     | `SUM()`          | Soma valores numéricos.                                                                          | `SUM(QuantidadeRefugo)`                                      |
+|                     | `COUNT()`        | Conta quantas linhas existem.                                                                    | `COUNT(Id)`                                                  |
+|                     | `HAVING`         | É o "WHERE" para dados agrupados (Filtra depois de agrupar).                                     | `GROUP BY Setor HAVING SUM(Qtd) > 1000`                      |
+| **Condicionais**    | `CASE WHEN`      | O "IF/ELSE" dentro do SELECT. Cria categorias dinâmicas.                                         | `CASE WHEN Qtd > 10 THEN 'Bom' ELSE 'Ruim' END`              |
+|                     | `ISNULL(col, 0)` | Se a coluna for NULL, troca por 0 (ou outro valor). Vital para relatórios.                       | `ISNULL(SUM(Qtd), 0)`                                        |
+| **Datas (T-SQL)**   | `GETDATE()`      | Pega a data e hora atual do servidor.                                                            | `DataCriacao DATETIME DEFAULT GETDATE()`                     |
+|                     | `DATEADD`        | Soma ou subtrai tempo de uma data.                                                               | `DATEADD(DAY, -5, GETDATE())` (5 dias atrás)                 |
+|                     | `DATEDIFF`       | Calcula a diferença entre duas datas.                                                            | `DATEDIFF(MINUTE, DataInicio, DataFim)`                      |
+
+---
+
+### 💡 Dica de Ouro: A Ordem de Execução
+
+Você escreve o SQL numa ordem, mas o banco lê em outra. Entender isso evita 90% dos erros de "Coluna não encontrada".
+
+**Você escreve:**
+`SELECT` -> `FROM` -> `WHERE` -> `GROUP BY` -> `HAVING` -> `ORDER BY`
+
+**O Banco lê assim:**
+1.  **`FROM` / `JOIN`**: Ele pega as tabelas e junta os dados primeiro.
+2.  **`WHERE`**: Ele filtra as linhas brutas (antes de agrupar).
+3.  **`GROUP BY`**: Ele amassa as linhas em grupos.
+4.  **`HAVING`**: Ele filtra os grupos (ex: só grupos com soma > 10).
+5.  **`SELECT`**: Só agora ele decide quais colunas mostrar e cria colunas calculadas.
+6.  **`ORDER BY`**: Por fim, ele ordena o resultado final.
+
+*É por isso que você não pode usar um "Apelido" que criou no `SELECT` dentro do `WHERE`. O `WHERE` acontece antes do `SELECT` existir.*
